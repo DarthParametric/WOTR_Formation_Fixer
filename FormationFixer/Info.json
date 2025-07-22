@@ -1,0 +1,14 @@
+﻿{
+    "Id": "FormationFixer",
+    "DisplayName": "Formation Fixer for More Party Slots",
+    "Author": "DarthParametric",
+    "Version": "1.0.0",
+    "GameVersion": "2.7.0",
+    "ManagerVersion": "0.32.4",
+    "Requirements": [ ],
+    "LoadAfter": [ "MorePartySlots" ],
+    "AssemblyName": "FormationFixer.dll",
+    "EntryMethod": "FormationFixer.Main.Load",
+    "HomePage": "https://github.com/DarthParametric/WOTR_Formation_Fixer",
+    "Repository": "https://raw.githubusercontent.com/DarthParametric/WOTR_Formation_Fixer/master/FormationFixer/Repository.json"
+}
