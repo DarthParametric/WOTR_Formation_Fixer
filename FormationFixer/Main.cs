@@ -1,7 +1,7 @@
-﻿using Kingmaker.Blueprints;
+﻿using Kingmaker;
+using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.JsonSystem;
 using Kingmaker.Blueprints.Root;
-using Kingmaker.EntitySystem.Entities;
 using Kingmaker.Formations;
 using Kingmaker.UI.Formation;
 using Kingmaker.UI.MVVM._PCView.Formation;
@@ -9,7 +9,6 @@ using Kingmaker.UI.MVVM._VM.Formation;
 using System.Reflection.Emit;
 using UnityEngine;
 using UnityModManagerNet;
-using static HarmonyLib.Code;
 
 namespace FormationFixer;
 
@@ -260,11 +259,12 @@ public static class Main
     }
 
     [HarmonyPatch(typeof(FormationCharacterVM), nameof(FormationCharacterVM.GetLocalPosition))]
+    [HarmonyDebug]
     static class Formation_UI_Offset_Patch
     {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
         {
-            CodeMatcher matcher = new(instructions);
+            CodeMatcher matcher = new(instructions, il);
 
             /*
             Code for adjusting the local position value of unit UI sprites:
@@ -284,18 +284,36 @@ public static class Main
 
             Change to:
 
-                Vector3 GetLocalPosition() => (Vector3) (this.GetOffset() * 40f + Vector2(0f, 200f)
-
+                if (Game.Instance.Player.FormationManager.CurrentFormationIndex == 0)
+                {
+	                return this.GetOffset() * 40f + new Vector2(0f, 200f);
+                }
+                return this.GetOffset() * 40f + this.OffsetPosition;
             */
 
-            matcher.Advance(5)
-                .RemoveInstructions(2)
-                .Insert([
-                    new CodeInstruction(OpCodes.Ldc_R4, 0f),
-                    new CodeInstruction(OpCodes.Ldc_R4, 200f),
-                    new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(Vector2), [typeof(float), typeof(float)]))
-                ]);
+            matcher.Start(); // Initialise at offset 0.
 
+            var jumpiffalse = il.DefineLabel();
+            matcher.AddLabels([jumpiffalse]); // Add a label so our added code at the start can jump to the original code.
+
+            matcher.Insert([
+                new CodeInstruction(OpCodes.Call, AccessTools.PropertyGetter(typeof(Game), nameof(Game.Instance))),
+                new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Game), nameof(Player))),
+                new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Player), nameof(Player.FormationManager))),
+                new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(PartyFormationManager), nameof(PartyFormationManager.CurrentFormationIndex))),
+                new CodeInstruction(OpCodes.Brtrue_S, jumpiffalse),
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Call, AccessTools.PropertyGetter(typeof(FormationCharacterVM), nameof(FormationCharacterVM.GetOffset))),
+                new CodeInstruction(OpCodes.Ldc_R4, 40f),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector2), "op_Multiply", [typeof(Vector2), typeof(float)])),
+                new CodeInstruction(OpCodes.Ldc_R4, 0f),
+                new CodeInstruction(OpCodes.Ldc_R4, 200f),
+                new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(Vector2), [typeof(float), typeof(float)])),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector2), "op_Addition", [typeof(Vector2), typeof(Vector2)])),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector3), "op_Implicit", [typeof(Vector2)])),
+                new CodeInstruction(OpCodes.Ret)
+                ]);
+            
             return matcher.InstructionEnumeration();
         }
     }
