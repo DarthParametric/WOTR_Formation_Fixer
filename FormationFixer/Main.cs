@@ -303,14 +303,14 @@ public static class Main
                 new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(PartyFormationManager), nameof(PartyFormationManager.CurrentFormationIndex))),
                 new CodeInstruction(OpCodes.Brtrue_S, jumpiffalse),
                 new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Call, AccessTools.PropertyGetter(typeof(FormationCharacterVM), nameof(FormationCharacterVM.GetOffset))),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FormationCharacterVM), nameof(FormationCharacterVM.GetOffset))),
                 new CodeInstruction(OpCodes.Ldc_R4, 40f),
                 new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector2), "op_Multiply", [typeof(Vector2), typeof(float)])),
                 new CodeInstruction(OpCodes.Ldc_R4, 0f),
                 new CodeInstruction(OpCodes.Ldc_R4, 200f),
                 new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(Vector2), [typeof(float), typeof(float)])),
                 new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector2), "op_Addition", [typeof(Vector2), typeof(Vector2)])),
-                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector3), "op_Implicit", [typeof(Vector2)])),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Vector2), "op_Implicit", [typeof(Vector3)])),
                 new CodeInstruction(OpCodes.Ret)
                 ]);
             
