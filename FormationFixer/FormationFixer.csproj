@@ -36,7 +36,7 @@
 		<Delete Files="@(ModDir)" />
 	</Target>
 	<ItemGroup>
-		<None Include="Info.json" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="Info.json" CopyToOutputDirectory="Always" />
 	</ItemGroup>
 	<Target Name="Deploy" AfterTargets="Build">
 		<ItemGroup>

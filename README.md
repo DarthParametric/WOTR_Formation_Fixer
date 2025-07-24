@@ -17,6 +17,6 @@ cause some unexpected wonkiness, so use the Restore to Default button if things 
 - The Auto formation does not handle large parties very well. I have tried to adjust its behaviour, with limited success. 
 
 # Thanks & Acknowledgements
-- microsoftenator2022 - Helped out with creating the first transpiler (which I subsequently rewrote, so all terrible code is my fault) and corrected some of my terrible syntax goofs.
+- microsoftenator2022 - Helped out with creating the first transpiler (which I subsequently rewrote, so all terrible code is my fault) and corrected some of my terrible syntax goofs. He also pointed out where the game was capping the max formation array size, leading to crashes.
 - ADDB - Provided the PostFix patch for scaling the usable area of the formation grid back up to the correct size after other UI scaling.
 - Everyone in the `#mod-dev-technical` channel of the Owlcat Discord server for various modding-related discussions and suggestions, help troubleshooting issues, and answering general questions.
