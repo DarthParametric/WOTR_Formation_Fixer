@@ -275,15 +275,19 @@ public static class Main
     [HarmonyPatch(typeof(FormationConsoleView), nameof(FormationConsoleView.OnFormationPresetChanged))]
     static class Formation_UI_Scale_Patch_Console
     {
-        static bool Prefix(ref int formationPresetIndex, FormationConsoleView __instance)
+        static bool Prefix(int formationPresetIndex, ref FormationConsoleView __instance)
         {
             float num = 0f;
+            var party = __instance.ViewModel.Characters;
             var localscale = __instance.m_CharacterContainer.localScale;
+            LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, localscale = {localscale}");
 
-            foreach (FormationCharacterVM formationCharacterVM in __instance.ViewModel.Characters)
+            foreach (FormationCharacterVM character in party)
             {
-                Vector3 localPosition = formationCharacterVM.GetLocalPosition();
-                LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, GetLocalPosition = {localPosition}");
+                Vector3 localPosition = character.GetLocalPosition();
+                var CharIdx = character.m_Index;
+                var CharName = character.Unit.CharacterName;
+                LogDebug($"Char index = {CharIdx}, name = {CharName}, GetLocalPosition = {localPosition}");
 
                 if (localPosition.y < num)
                 {
@@ -293,23 +297,22 @@ public static class Main
 
             if (num < -170f && formationPresetIndex == 0)
             {
-                float num2 = -170f / num;
+                float num2 = (-170f / num) * 0.5f;
 
                 localscale = new Vector3(num2, num2, localscale.z);
-                LogDebug($"FormationConsoleView.OnFormationPresetChanged, Auto formation with num < -170, m_CharacterContainer.localScale = {localscale}");
+                LogDebug($"num < -170, adjusted localScale = {localscale}");
             }
+            /*
+            else if (formationPresetIndex == 0)
+            {
+                localscale = new Vector3(0.7f, 0.7f, 1f);
+                LogDebug($"m_CharacterContainer.localScale = {localscale}");
+            }
+            */
             else
             {
-                if (formationPresetIndex == 0)
-                {
-                    localscale = new Vector3(0.7f, 0.7f, 1f);
-                    LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, m_CharacterContainer.localScale = {localscale}");
-                }
-                else
-                {
-                    localscale = new Vector3(0.45f, 0.45f, 1f);
-                    LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, m_CharacterContainer.localScale = {localscale}");
-                }
+                localscale = new Vector3(0.5f, 0.5f, 1f);
+                LogDebug($"Adjusted localScale = {localscale}");
             }
 
             return false;
@@ -352,13 +355,13 @@ public static class Main
                 offset = 145;
             }
 
-            //LogDebug($"Party count = {PtyCnt}, offset = {offset}");
+            LogDebug($"Party count = {PtyCnt}, offset = {offset}");
 
             if (CurrInd == 0)
             {
                 Vector2 Auto = AdjPos + new Vector2(0f, offset);
 
-                //LogDebug($"Char index = {__instance.m_Index}, unit = {__instance.Unit}, GetOffset() = {CurrPos}, AdjPos = {AdjPos}, DefPos = {DefPos}, final position = {Auto}");
+                LogDebug($"Char index = {__instance.m_Index}, name = {__instance.Unit.CharacterName}, GetOffset() = {CurrPos}, AdjPos = {AdjPos}, DefPos = {DefPos}, final position = {Auto}");
 
                 __result = Auto;
             }
