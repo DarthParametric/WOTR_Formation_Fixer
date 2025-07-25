@@ -2,13 +2,11 @@
 using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.JsonSystem;
 using Kingmaker.Blueprints.Root;
-using Kingmaker.EntitySystem.Entities;
 using Kingmaker.Formations;
 using Kingmaker.UI.Formation;
 using Kingmaker.UI.MVVM._ConsoleView.Formation;
 using Kingmaker.UI.MVVM._PCView.Formation;
 using Kingmaker.UI.MVVM._VM.Formation;
-using Owlcat.Runtime.UI.MVVM;
 using System.Reflection.Emit;
 using UnityEngine;
 using UnityModManagerNet;
@@ -53,9 +51,9 @@ public static class Main
 
         LogDebug("Patching formation blueprints.");
 
-        //BPFormRoot.FormationsScale = 0.7f;            // Default is 0.9 - Only scales the formation positions, not the icon size.
-        //BPFormRoot.MinSpaceFactor = 0.2f;             // Default is 0.66
-        //BPFormRoot.AutoFormation.SpaceX = 1.0f;       // Default is 1.5 - Kingmaker.Formations.PartyAutoFormationHelper uses these when assembling the auto formation.
+        //BPFormRoot.FormationsScale = 0.9f;            // Default is 0.9 - Only scales the formation positions, not the icon size.
+        //BPFormRoot.MinSpaceFactor = 0.66f;            // Default is 0.66
+        //BPFormRoot.AutoFormation.SpaceX = 1.5f;       // Default is 1.5 - Kingmaker.Formations.PartyAutoFormationHelper uses these when assembling the auto formation.
         BPFormRoot.AutoFormation.SpaceY = 1.5f;         // Default is 2.5
 
         //                                #1                      #2                      #3                      #4                      #5                      #6                      #7                      #8                      #9                     #10                      #11                     #12                     #13                     #14                     #15                     #16                     #17                    #18                     #19                      #20                     #21                    #22                     #23                     #24
@@ -271,51 +269,65 @@ public static class Main
         }
     }
 
-    // Equivalent patch for the controller UI layout, using a Prefix instead of transpiler (variety is the spice of life?).
+    // Equivalent patch to the above for the controller UI layout. The method is identical, it's just in a different castle.
     [HarmonyPatch(typeof(FormationConsoleView), nameof(FormationConsoleView.OnFormationPresetChanged))]
     static class Formation_UI_Scale_Patch_Console
     {
-        static bool Prefix(int formationPresetIndex, ref FormationConsoleView __instance)
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
         {
-            float num = 0f;
-            var party = __instance.ViewModel.Characters;
-            var localscale = __instance.m_CharacterContainer.localScale;
-            LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, localscale = {localscale}");
+            CodeMatcher matcher = new(instructions, il);
 
-            foreach (FormationCharacterVM character in party)
-            {
-                Vector3 localPosition = character.GetLocalPosition();
-                var CharIdx = character.m_Index;
-                var CharName = character.Unit.CharacterName;
-                LogDebug($"Char index = {CharIdx}, name = {CharName}, GetLocalPosition = {localPosition}");
+            matcher.MatchStartForward(
+                new CodeMatch(OpCodes.Ldloc_0),
+                new CodeMatch(OpCodes.Ldc_R4, -185f),
+                new CodeMatch(OpCodes.Bge_Un_S)
+            );
 
-                if (localPosition.y < num)
-                {
-                    num = localPosition.y;
-                }
-            }
+            matcher.Advance(1)
+                .RemoveInstruction()
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f))     // Replace -185 with -170.
+                .Advance(1);
 
-            if (num < -170f && formationPresetIndex == 0)
-            {
-                float num2 = (-170f / num) * 0.5f;
+            var jumptoend = matcher.Operand;    // Jumps to final this.m_CharacterContainer.localScale = Vector3.one, required in second edit.
 
-                localscale = new Vector3(num2, num2, localscale.z);
-                LogDebug($"num < -170, adjusted localScale = {localscale}");
-            }
-            /*
-            else if (formationPresetIndex == 0)
-            {
-                localscale = new Vector3(0.7f, 0.7f, 1f);
-                LogDebug($"m_CharacterContainer.localScale = {localscale}");
-            }
-            */
-            else
-            {
-                localscale = new Vector3(0.5f, 0.5f, 1f);
-                LogDebug($"Adjusted localScale = {localscale}");
-            }
+            matcher.InsertAfter([
+                new CodeInstruction(OpCodes.Ldarg_1),
+                new CodeInstruction(OpCodes.Brtrue_S, jumptoend)    // Temporarily use this label, replace later after new code added.
+            ]);
 
-            return false;
+            matcher.Advance(3)
+                .RemoveInstruction()
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f));     // Replace -185 with -170.
+
+            matcher.MatchStartForward(CodeMatch.Calls(AccessTools.PropertyGetter(typeof(Vector3), nameof(Vector3.one))))
+                .Advance(-3)
+                .InsertAfterAndAdvance(new CodeInstruction(OpCodes.Ldarg_1));
+
+            var secondblock = matcher.Pos;      // Create a jump offset reference for subsequent label application.
+
+            matcher.InsertAfter([
+                new CodeInstruction(OpCodes.Brfalse_S, jumptoend),
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(FormationPCView), nameof(FormationPCView.m_CharacterContainer))),
+                new CodeInstruction(OpCodes.Ldc_R4, 0.7f),
+                new CodeInstruction(OpCodes.Ldc_R4, 0.7f),
+                new CodeInstruction(OpCodes.Ldc_R4, 1.0f),
+                new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(Vector3), [typeof(float), typeof(float), typeof(float)])),
+                new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertySetter(typeof(Transform), "localScale")),
+                new CodeInstruction(OpCodes.Ret)
+            ]);
+
+            matcher.Start()     // Return to the first section to change the jump offsets so they can reach the above added code.
+                .MatchEndForward(
+                    new CodeMatch(OpCodes.Ldloc_0),
+                    new CodeMatch(OpCodes.Ldc_R4, -170f),   // Need to use the new value we changed this to earlier (originally -185).
+                    new CodeMatch(OpCodes.Bge_Un_S)
+                )
+                .SetJumpTo(OpCodes.Bge_Un_S, secondblock, out _)
+                .Advance(2)
+                .SetJumpTo(OpCodes.Brtrue_S, secondblock, out _);
+
+            return matcher.InstructionEnumeration();
         }
     }
 

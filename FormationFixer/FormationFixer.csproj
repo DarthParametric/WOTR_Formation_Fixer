@@ -4,7 +4,7 @@
 	<PropertyGroup>
 		<TargetFramework>net481</TargetFramework>
 		<AssemblyName>FormationFixer</AssemblyName>
-		<Description>Large Party Formation Fixer</Description>
+		<Description>Formation Fixer for More Party Slots</Description>
 		<Version>1.0.0</Version>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<LangVersion>latest</LangVersion>
