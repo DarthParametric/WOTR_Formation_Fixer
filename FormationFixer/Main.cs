@@ -5,8 +5,10 @@ using Kingmaker.Blueprints.Root;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.Formations;
 using Kingmaker.UI.Formation;
+using Kingmaker.UI.MVVM._ConsoleView.Formation;
 using Kingmaker.UI.MVVM._PCView.Formation;
 using Kingmaker.UI.MVVM._VM.Formation;
+using Owlcat.Runtime.UI.MVVM;
 using System.Reflection.Emit;
 using UnityEngine;
 using UnityModManagerNet;
@@ -167,6 +169,7 @@ public static class Main
 
     // Patch that scales down the UI formation positions and character portraits by 70% to fit more on screen.
     // Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
+    // Only applies to the keyboard and mouse UI layout.
     [HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
     static class Formation_UI_Scale_Patch_PC
     {
@@ -185,7 +188,7 @@ public static class Main
 
             Change it to:
             
-	            if (num < -185f && formationPresetIndex == 0)
+	            if (num < -170f && formationPresetIndex == 0)
 
             Ensures it only applies to the Auto formation. Additionally, change the -185 with -170 to scale it sooner to try
             and prevent the formation going past the bottom edge of the grid.
@@ -265,6 +268,47 @@ public static class Main
                 .SetJumpTo(OpCodes.Brtrue_S, secondblock, out _);
 
             return matcher.InstructionEnumeration();
+        }
+    }
+
+    // Equivalent patch for the controller UI layout, using a Prefix instead of transpiler (variety is the spice of life?).
+    [HarmonyPatch(typeof(FormationConsoleView), nameof(FormationConsoleView.OnFormationPresetChanged))]
+    static class Formation_UI_Scale_Patch_Console
+    {
+        static bool Prefix(ref int formationPresetIndex, FormationConsoleView __instance)
+        {
+            float num = 0f;
+            var localscale = __instance.m_CharacterContainer.localScale;
+
+            foreach (FormationCharacterVM formationCharacterVM in __instance.ViewModel.Characters)
+            {
+                Vector3 localPosition = formationCharacterVM.GetLocalPosition();
+
+                if (localPosition.y < num)
+                {
+                    num = localPosition.y;
+                }
+            }
+
+            if (num < -170f && formationPresetIndex == 0)
+            {
+                float num2 = -170f / num;
+
+                localscale = new Vector3(num2, num2, localscale.z);
+            }
+            else
+            {
+                if (formationPresetIndex == 0)
+                {
+                    localscale = Vector3.one;
+                }
+                else
+                {
+                    localscale = new Vector3(0.7f, 0.7f, 1f);
+                }
+            }
+
+            return false;
         }
     }
 
