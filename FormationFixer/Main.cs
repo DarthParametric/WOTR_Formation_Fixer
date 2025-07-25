@@ -283,6 +283,7 @@ public static class Main
             foreach (FormationCharacterVM formationCharacterVM in __instance.ViewModel.Characters)
             {
                 Vector3 localPosition = formationCharacterVM.GetLocalPosition();
+                LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, GetLocalPosition = {localPosition}");
 
                 if (localPosition.y < num)
                 {
@@ -295,16 +296,19 @@ public static class Main
                 float num2 = -170f / num;
 
                 localscale = new Vector3(num2, num2, localscale.z);
+                LogDebug($"FormationConsoleView.OnFormationPresetChanged, Auto formation with num < -170, m_CharacterContainer.localScale = {localscale}");
             }
             else
             {
                 if (formationPresetIndex == 0)
                 {
-                    localscale = Vector3.one;
+                    localscale = new Vector3(0.7f, 0.7f, 1f);
+                    LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, m_CharacterContainer.localScale = {localscale}");
                 }
                 else
                 {
-                    localscale = new Vector3(0.7f, 0.7f, 1f);
+                    localscale = new Vector3(0.45f, 0.45f, 1f);
+                    LogDebug($"FormationConsoleView.OnFormationPresetChanged, formation index = {formationPresetIndex}, m_CharacterContainer.localScale = {localscale}");
                 }
             }
 
@@ -348,13 +352,13 @@ public static class Main
                 offset = 145;
             }
 
-            LogDebug($"Party count = {PtyCnt}, offset = {offset}");
+            //LogDebug($"Party count = {PtyCnt}, offset = {offset}");
 
             if (CurrInd == 0)
             {
                 Vector2 Auto = AdjPos + new Vector2(0f, offset);
 
-                LogDebug($"Char index = {__instance.m_Index}, unit = {__instance.Unit}, GetOffset() = {CurrPos}, AdjPos = {AdjPos}, DefPos = {DefPos}, final position = {Auto}");
+                //LogDebug($"Char index = {__instance.m_Index}, unit = {__instance.Unit}, GetOffset() = {CurrPos}, AdjPos = {AdjPos}, DefPos = {DefPos}, final position = {Auto}");
 
                 __result = Auto;
             }
