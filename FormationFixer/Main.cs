@@ -1,5 +1,4 @@
-﻿using JetBrains.Annotations;
-using Kingmaker;
+﻿using Kingmaker;
 using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.JsonSystem;
 using Kingmaker.Blueprints.Root;
@@ -188,10 +187,10 @@ public static class Main
         }
     }
 
-        // Patch that scales down the UI formation positions and character portraits by 70% to fit more on screen.
-        // Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
-        // Only applies to the keyboard and mouse UI layout.
-        [HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
+	// Patch that scales down the UI formation positions and character portraits by 70% to fit more on screen.
+	// Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
+	// Only applies to the keyboard and mouse UI layout.
+	[HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
     static class Formation_UI_Scale_Patch_PC
     {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
@@ -413,7 +412,6 @@ public static class Main
     // Allows for the center of character icons to be moved right to the edge of the grid before further movement is clamped.
     // The Auto formation bounds are scaled down slightly from the vanilla values to prevent it pushing outside the grid edges.
     [HarmonyPatch(typeof(FormationCharacterDragComponent), nameof(FormationCharacterDragComponent.Initialize))]
-
     public static class Formation_UI_Grid_Scale_Patch
     {
         [HarmonyPostfix]
