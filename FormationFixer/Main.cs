@@ -1,4 +1,5 @@
-﻿using Kingmaker;
+﻿using JetBrains.Annotations;
+using Kingmaker;
 using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.JsonSystem;
 using Kingmaker.Blueprints.Root;
@@ -108,67 +109,89 @@ public static class Main
         }
     }
 
-    // Patch the Auto formation setup to make it use wider rows (default is 4 or 3 max).
-    [HarmonyPatch(typeof(PartyAutoFormationHelper), nameof(PartyAutoFormationHelper.SetupLinePositions))]
-    static class Auto_Formation_Condenser_Patch
+    // Removes the unnecessary gap in the Auto formation when no off-tank is present.
+    [HarmonyPatch(typeof(PartyAutoFormationHelper), nameof(PartyAutoFormationHelper.SetupPositions))]
+    class Auto_Formation_Condenser_Patch_1
     {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            CodeMatcher matcher = new(instructions);
-
             /*
-            Code for the allowed number of party members in each row:
+            This in the method that sets the row offsets. It inserts an empty row if there is no off-tank. Original code:
 
-                int num = ((line.Count > 5) ? Math.Min(4, line.Count) : Math.Min(3, line.Count))
+		    	formation.SetOffset(mainTank.Unit, Vector2.zero);
+			    vector -= new Vector2(0f, PartyAutoFormationHelper.SpaceY);
+			    if (offTank != null)
+			    {
+				    formation.SetOffset(offTank.Unit, vector);
+			    }
+			    vector -= new Vector2(0f, PartyAutoFormationHelper.SpaceY);
 
-                IL_0002: ldarg.2    // line
-                IL_0003: callvirt   virtual System.Int32 System.Collections.Generic.List`1<Kingmaker.Formations.UnitFormationData>::get_Count()
-                IL_0008: ldc.i4.5
-                IL_0009: bgt =>     Label0
-                IL_000E: ldc.i4.3
-                IL_000F: ldarg.2
-                IL_0010: callvirt   virtual System.Int32 System.Collections.Generic.List`1<Kingmaker.Formations.UnitFormationData>::get_Count()
-                IL_0015: call       static System.Int32 System.Math::Min(System.Int32 val1, System.Int32 val2)
-                IL_001A: br =>      Label1
-                IL_001F: Label0
-                IL_001F: ldc.i4.4
-                IL_0020: ldarg.2    // line
-                IL_0021: callvirt   virtual System.Int32 System.Collections.Generic.List`1<Kingmaker.Formations.UnitFormationData>::get_Count()
-                IL_0026: call       static System.Int32 System.Math::Min(System.Int32 val1, System.Int32 val2)
-                IL_002B: Label1
-                IL_002B: stloc.1    // num2
-                IL_002C: br =>      Label2
-            
-            Change to:
+                IL_0017: ldloc.0
+                IL_0018: ldc.r4     0
+                IL_001D: call       static System.Single Kingmaker.Formations.PartyAutoFormationHelper::get_SpaceY()
+                IL_0022: newobj     System.Void UnityEngine.Vector2::.ctor(System.Single x, System.Single y)
+                IL_0027: call       static UnityEngine.Vector2 UnityEngine.Vector2::op_Subtraction(UnityEngine.Vector2 a, UnityEngine.Vector2 b)
+                IL_002C: stloc.0
+                IL_002D: ldarg.2
+                IL_002E: brfalse => Label0
 
-                int num = ((line.Count > 5) ? Math.Min(6, line.Count) : Math.Min(4, line.Count))
-            
-            Default formation maxes out at 4 wide. Increase cap to 6.
+            By moving the second vector assignment inside the if check, it should no longer create an unnecessary empty row when
+            no off-tank is present.
             */
 
+            CodeMatcher matcher = new(instructions);
+
             matcher.MatchEndForward(
-                new CodeMatch(OpCodes.Ldarg_2),
-                new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(List<PartyAutoFormationHelper.UnitFormationData>), "get_Count")),
-                new CodeMatch(OpCodes.Ldc_I4_5)
-            )
-                .Advance(2)
-                .RemoveInstruction()                                                        // Remove original int 3 (ldc.i4.3)
-                .Insert(new CodeInstruction(OpCodes.Ldc_I4_4))                              // int 4
-                .Advance(5);
+                new CodeMatch(OpCodes.Ldarg_2),                                     // Load the offTank argument.
+                new CodeMatch(OpCodes.Brfalse_S)                                    // Break if false/null.
+            );
 
-            List<Label> jumphere = matcher.Labels.ToList();                                 // Copy the vanilla label so it can be reapplied to the replacement instruction.
+            var jumpto = matcher.Operand;                                           // Store the jump label for the break.
 
-            matcher.RemoveInstruction()                                                     // Remove original int 4 (ldc.i4.4)
-                .Insert([new CodeInstruction(OpCodes.Ldc_I4_6) { labels = jumphere }]);     // int 6
+            matcher.RemoveInstruction()                                             // Remove the brfalse.
+                .Advance(-1)
+                .RemoveInstruction()                                                // Remove the ldarg.2.
+                .Advance(-7)                                                        // Move back to the start of the vector declaration block (ldloc.0).
+                .InsertAfter([
+                    new CodeInstruction(OpCodes.Ldarg_2),                           // Add the ldarg.2.
+                    new CodeInstruction(OpCodes.Brfalse_S, jumpto)                  // Add the brfalse with the original jump label.
+                ]);
 
             return matcher.InstructionEnumeration();
         }
     }
+    
+    // Patch the Auto formation line setup to make it use wider rows (default is 4 or 3 max).
+    [HarmonyPatch(typeof(PartyAutoFormationHelper), nameof(PartyAutoFormationHelper.SetupLinePositions))]
+    class Auto_Formation_Condenser_Patch_2
+    {
+        static bool Prefix(PartyFormationAuto formation, ref Vector2 center, List<PartyAutoFormationHelper.UnitFormationData> line)
+        {
+            int i = 0;
+            int num = ((line.Count > 5) ? Math.Min(6, line.Count) : Math.Min(4, line.Count));
 
-    // Patch that scales down the UI formation positions and character portraits by 70% to fit more on screen.
-    // Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
-    // Only applies to the keyboard and mouse UI layout.
-    [HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
+            while (i < line.Count)
+            {
+                float num2 = -PartyAutoFormationHelper.SpaceX / 2f * (float)(num - 1);
+                for (int j = i; j < i + num; j++)
+                {
+                    Vector2 vector = center + new Vector2(num2, 0f);
+                    formation.SetOffset(line[j].Unit, vector);
+                    num2 += PartyAutoFormationHelper.SpaceX;
+                }
+                i += num;
+                num = ((line.Count > 5) ? Math.Min(12 - num, line.Count - i) : Math.Min(10 - num, line.Count - i));
+                center -= new Vector2(0f, PartyAutoFormationHelper.SpaceY);
+            }
+
+            return false;
+        }
+    }
+
+        // Patch that scales down the UI formation positions and character portraits by 70% to fit more on screen.
+        // Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
+        // Only applies to the keyboard and mouse UI layout.
+        [HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
     static class Formation_UI_Scale_Patch_PC
     {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
@@ -202,19 +225,19 @@ public static class Main
 
             matcher.Advance(1)
                 .RemoveInstruction()
-                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f))     // Replace -185 with -170.
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f))                 // Replace -185 with -170.
                 .Advance(1);
 
-            var jumptoend = matcher.Operand;    // Jumps to final this.m_CharacterContainer.localScale = Vector3.one, required in second edit.
+            var jumptoend = matcher.Operand;                                        // Jumps to final this.m_CharacterContainer.localScale = Vector3.one, required in second edit.
 
             matcher.InsertAfter([
                 new CodeInstruction(OpCodes.Ldarg_1),
-                new CodeInstruction(OpCodes.Brtrue_S, jumptoend)    // Temporarily use this label, replace later after new code added.
+                new CodeInstruction(OpCodes.Brtrue_S, jumptoend)                    // Temporarily use this label, replace later after new code added.
             ]);
 
             matcher.Advance(3)
                 .RemoveInstruction()
-                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f));     // Replace -185 with -170.
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f));                // Replace -185 with -170.
 
             /*
             Code for default UI scaling if previous check falls through:
@@ -241,7 +264,7 @@ public static class Main
                 .Advance(-3)
                 .InsertAfterAndAdvance(new CodeInstruction(OpCodes.Ldarg_1));
 
-            var secondblock = matcher.Pos;      // Create a jump offset reference for subsequent label application.
+            var secondblock = matcher.Pos;                                          // Create a jump offset reference for subsequent label application.
 
             matcher.InsertAfter([
                 new CodeInstruction(OpCodes.Brfalse_S, jumptoend),
@@ -255,10 +278,10 @@ public static class Main
                 new CodeInstruction(OpCodes.Ret)
             ]);
 
-            matcher.Start()     // Return to the first section to change the jump offsets so they can reach the above added code.
+            matcher.Start()                                                         // Return to the first section to change the jump offsets so they can reach the above added code.
                 .MatchEndForward(
                     new CodeMatch(OpCodes.Ldloc_0),
-                    new CodeMatch(OpCodes.Ldc_R4, -170f),   // Need to use the new value we changed this to earlier (originally -185).
+                    new CodeMatch(OpCodes.Ldc_R4, -170f),                           // Need to use the new value we changed this to earlier (originally -185).
                     new CodeMatch(OpCodes.Bge_Un_S)
                 )
                 .SetJumpTo(OpCodes.Bge_Un_S, secondblock, out _)
@@ -285,25 +308,25 @@ public static class Main
 
             matcher.Advance(1)
                 .RemoveInstruction()
-                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f))     // Replace -185 with -170.
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f))                 // Replace -185 with -170.
                 .Advance(1);
 
-            var jumptoend = matcher.Operand;    // Jumps to final this.m_CharacterContainer.localScale = Vector3.one, required in second edit.
+            var jumptoend = matcher.Operand;                                        // Jumps to final this.m_CharacterContainer.localScale = Vector3.one, required in second edit.
 
             matcher.InsertAfter([
                 new CodeInstruction(OpCodes.Ldarg_1),
-                new CodeInstruction(OpCodes.Brtrue_S, jumptoend)    // Temporarily use this label, replace later after new code added.
+                new CodeInstruction(OpCodes.Brtrue_S, jumptoend)                    // Temporarily use this label, replace later after new code added.
             ]);
 
             matcher.Advance(3)
                 .RemoveInstruction()
-                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f));     // Replace -185 with -170.
+                .Insert(new CodeInstruction(OpCodes.Ldc_R4, -170f));                // Replace -185 with -170.
 
             matcher.MatchStartForward(CodeMatch.Calls(AccessTools.PropertyGetter(typeof(Vector3), nameof(Vector3.one))))
                 .Advance(-3)
                 .InsertAfterAndAdvance(new CodeInstruction(OpCodes.Ldarg_1));
 
-            var secondblock = matcher.Pos;      // Create a jump offset reference for subsequent label application.
+            var secondblock = matcher.Pos;                                          // Create a jump offset reference for subsequent label application.
 
             matcher.InsertAfter([
                 new CodeInstruction(OpCodes.Brfalse_S, jumptoend),
@@ -317,10 +340,10 @@ public static class Main
                 new CodeInstruction(OpCodes.Ret)
             ]);
 
-            matcher.Start()     // Return to the first section to change the jump offsets so they can reach the above added code.
+            matcher.Start()                                                         // Return to the first section to change the jump offsets so they can reach the above added code.
                 .MatchEndForward(
                     new CodeMatch(OpCodes.Ldloc_0),
-                    new CodeMatch(OpCodes.Ldc_R4, -170f),   // Need to use the new value we changed this to earlier (originally -185).
+                    new CodeMatch(OpCodes.Ldc_R4, -170f),                           // Need to use the new value we changed this to earlier (originally -185).
                     new CodeMatch(OpCodes.Bge_Un_S)
                 )
                 .SetJumpTo(OpCodes.Bge_Un_S, secondblock, out _)
@@ -346,17 +369,17 @@ public static class Main
 
             float offset;
 
-            if (PtyCnt > 16)
+            if (PtyCnt > 18)
             {
-                offset = 210f;
+                offset = 150f;
             }
             else if (PtyCnt > 12)
             {
-                offset = 160;
+                offset = 140;
             }
             else if (PtyCnt > 6)
             {
-                offset = 155;
+                offset = 130;
             }
             else if (PtyCnt == 1)
             {
@@ -364,7 +387,7 @@ public static class Main
             }
             else
             {
-                offset = 145;
+                offset = 110;
             }
 
             LogDebug($"Party count = {PtyCnt}, offset = {offset}");
