@@ -191,6 +191,7 @@ public static class Main
 	// Also prevents the default auto-scaling from affecting any formation other than the Auto formation.
 	// Only applies to the keyboard and mouse UI layout.
 	[HarmonyPatch(typeof(FormationPCView), nameof(FormationPCView.OnFormationPresetChanged))]
+    [HarmonyDebug]
     static class Formation_UI_Scale_Patch_PC
     {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
