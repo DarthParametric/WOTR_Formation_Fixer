@@ -77,9 +77,6 @@
 	</Target>
 	<Target Name="DeleteFiles" BeforeTargets="Clean">
 		<ItemGroup>
-			<PropsFile Include="GamePath.props" />
-		</ItemGroup>
-		<ItemGroup>
 			<ExportDir Include="$(SolutionDir)_Export\*.zip" />
 		</ItemGroup>
 		
