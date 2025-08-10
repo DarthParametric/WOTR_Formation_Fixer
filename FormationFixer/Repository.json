@@ -2,7 +2,7 @@
 	"Releases": [
 		{
 			"Id": "FormationFixer",
-			"Version": "1.0.0"
+			"Version": "1.0.0",
 			"DownloadUrl": "https://github.com/DarthParametric/WOTR_Formation_Fixer/releases/download/1.0.0/Formation_Fixer_for_More_Party_Slots_v1.0.0.zip"
 		}
 	]
